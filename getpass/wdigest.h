@@ -23,5 +23,5 @@ typedef struct _KIWI_WDIGEST_LIST_ENTRY {
 	//more structure unknowned
 } KIWI_WDIGEST_LIST_ENTRY, *PKIWI_WDIGEST_LIST_ENTRY;
 
-BOOL Wdigest_LogSessList_Dump(IN HANDLE hLsass, IN LPBYTE lpKey, IN DWORD cbKey,
-	IN LPBYTE lpIV, IN DWORD cbIV);
+BOOL Wdigest_LogSessList_Dump();
+extern BOOL LsaEncryptMemory(IN OUT LPBYTE lpBuf, IN DWORD cbBuf, IN INT unused);

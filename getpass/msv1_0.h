@@ -100,5 +100,6 @@ typedef struct _MSV1_0_SESSION_ENTRY {
 } MSV1_0_SESSION_ENTRY, *PMSV1_0_SESSION_ENTRY;
 
 
-BOOL Msv1_0_LogonSessList_Dump(IN HANDLE hLsass, IN LPBYTE lpKey, IN DWORD cbKey,
-	IN LPBYTE lpIV, IN DWORD cbIV);
+BOOL Msv1_0_LogonSessList_Dump();
+extern BOOL ReadLsassLSAString(IN PLSA_UNICODE_STRING lpUStr, OUT LPBYTE lpBuff);
+extern BOOL LsaEncryptMemory(IN OUT LPBYTE lpBuf, IN DWORD cbBuf, IN INT unused);

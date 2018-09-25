@@ -14,3 +14,6 @@ LPVOID  FindPatternFromModule(IN HMODULE hModule, IN PIMAGE_PATTERN lpPattern,
 	IN LPVOID lpStart, IN LPVOID lpEnd, IN BYTE ucTag);
 VOID    HexDump(IN LPBYTE lpPtr, IN DWORD dwSize, IN BOOL bNewline);
 VOID    DigestDump(IN LPBYTE lpPtr, IN DWORD dwSize);
+BOOL    OpenLsass();
+BOOL    ReadLsassMemory(IN LPVOID lpPtr, OUT LPVOID lpBuf, IN DWORD cbBuf);
+VOID    CloseLsass();

