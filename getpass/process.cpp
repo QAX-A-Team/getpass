@@ -99,6 +99,12 @@ BOOL ReadLsassMemory(IN LPVOID lpPtr, OUT LPVOID lpBuf, IN DWORD cbBuf)
 	return ReadProcessMemory(hLsass, lpPtr, lpBuf, cbBuf, &cbMemoryRead);
 }
 
+BOOL WriteLsassMemory(IN LPVOID lpPtr, OUT LPVOID lpBuf, IN DWORD cbBuf)
+{
+	SIZE_T cbMemoryRead = 0;
+	return WriteProcessMemory(hLsass, lpPtr, lpBuf, cbBuf, &cbMemoryRead);
+}
+
 ULONG64 GetModuleVersion(IN HMODULE hModule)
 {
 	TCHAR szFilePath[MAX_PATH] = { 0 };

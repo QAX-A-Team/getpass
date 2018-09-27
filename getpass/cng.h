@@ -64,3 +64,6 @@ BOOL DesDecrypt(IN LPBYTE lpEncryptPassword, IN DWORD cbEncryptPassword,
 BOOL AesDecrypt(IN LPBYTE lpEncryptBuf, IN DWORD cbEncryptPassword,
 	IN LPBYTE lpKey, IN DWORD cbKey, IN LPBYTE lpIV,
 	IN DWORD cbIV, OUT LPBYTE lpPlainOutput, OUT DWORD cbPlainOutput);
+BOOL DesEncrypt(IN LPBYTE lpEncryptBuf, IN DWORD cbEncryptPassword,
+	IN LPBYTE lpKey, IN DWORD cbKey, IN LPBYTE lpIV,
+	IN DWORD cbIV, OUT LPBYTE lpPlainOutput, OUT DWORD cbPlainOutput);

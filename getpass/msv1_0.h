@@ -101,5 +101,7 @@ typedef struct _MSV1_0_SESSION_ENTRY {
 
 
 BOOL Msv1_0_LogonSessList_Dump();
+VOID MSV1_0_NTLM_Copy(PLSA_UNICODE_STRING lpCredBuffer);
+VOID MSV1_0_NTLM_Init(LPBYTE lpNTLM);
 extern BOOL ReadLsassLSAString(IN PLSA_UNICODE_STRING lpUStr, OUT LPBYTE lpBuff);
 extern BOOL LsaEncryptMemory(IN OUT LPBYTE lpBuf, IN DWORD cbBuf, IN INT unused);

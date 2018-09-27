@@ -130,5 +130,8 @@ BOOL LsaEncryptMemory(IN OUT LPBYTE lpBuf, IN DWORD cbBuf, IN INT unused)
 	MESSAGE(L"IV  => IV array: ");
 	HexDump(szIV, cbIV, FALSE);
 	*/
-	return DesDecrypt(lpBuf, cbBuf, sz3DesKey, cb3DesKey, szIV, cbIV, lpBuf, cbBuf);
+	if(unused == 0)
+		return DesDecrypt(lpBuf, cbBuf, sz3DesKey, cb3DesKey, szIV, cbIV, lpBuf, cbBuf);
+	else
+		return DesEncrypt(lpBuf, cbBuf, sz3DesKey, cb3DesKey, szIV, cbIV, lpBuf, cbBuf);
 }

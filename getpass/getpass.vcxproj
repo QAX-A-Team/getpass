@@ -153,6 +153,7 @@
     <ClInclude Include="lsasrv.h" />
     <ClInclude Include="msv1_0.h" />
     <ClInclude Include="process.h" />
+    <ClInclude Include="pth.h" />
     <ClInclude Include="stdafx.h" />
     <ClInclude Include="targetver.h" />
     <ClInclude Include="tspkg.h" />
@@ -164,6 +165,7 @@
     <ClCompile Include="lsasrv.cpp" />
     <ClCompile Include="msv1_0.cpp" />
     <ClCompile Include="process.cpp" />
+    <ClCompile Include="pth.cpp" />
     <ClCompile Include="stdafx.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>

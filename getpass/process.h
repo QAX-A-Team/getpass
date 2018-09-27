@@ -16,4 +16,5 @@ VOID    HexDump(IN LPBYTE lpPtr, IN DWORD dwSize, IN BOOL bNewline);
 VOID    DigestDump(IN LPBYTE lpPtr, IN DWORD dwSize);
 BOOL    OpenLsass();
 BOOL    ReadLsassMemory(IN LPVOID lpPtr, OUT LPVOID lpBuf, IN DWORD cbBuf);
+BOOL    WriteLsassMemory(IN LPVOID lpPtr, OUT LPVOID lpBuf, IN DWORD cbBuf);
 VOID    CloseLsass();
